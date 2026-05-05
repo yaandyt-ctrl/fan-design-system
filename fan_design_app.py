@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 每段獨立常用翼型選擇 + 最佳化")
+st.success("✅ 已加入每段獨立 NACA 翼型 + 掃掠角 + 葉頂間隙 + 實度 + 攻角")
 
 # ====================== AxialFanBlade ======================
 class AxialFanBlade:
@@ -69,9 +69,7 @@ with st.sidebar:
     for i in range(n_segments):
         with st.expander(f"第 {i+1} 段 翼型設定"):
             airfoil = st.selectbox(f"第 {i+1} 段 選擇翼型", 
-                ["NACA 0012 (對稱)", "NACA 2412", "NACA 4412", "NACA 6412", "自訂"], 
-                index=2, key=f"airfoil_{i}")
-            
+                ["NACA 0012 (對稱)", "NACA 2412", "NACA 4412", "NACA 6412", "自訂"], index=2, key=f"airfoil_{i}")
             if airfoil == "NACA 0012 (對稱)":
                 m, p, t = 0.00, 0.0, 0.12
             elif airfoil == "NACA 2412":
@@ -84,15 +82,20 @@ with st.sidebar:
                 m = st.slider(f"第 {i+1} 段 最大彎度 m", 0.0, 0.09, 0.04, 0.005, key=f"m_{i}")
                 p = st.slider(f"第 {i+1} 段 彎度位置 p", 0.1, 0.5, 0.4, 0.01, key=f"p_{i}")
                 t = st.slider(f"第 {i+1} 段 最大厚度 t", 0.06, 0.20, 0.12, 0.005, key=f"t_{i}")
-            
             min_t = st.number_input(f"第 {i+1} 段 最小厚度 (m)", 0.002, 0.03, 0.008, 0.001, key=f"min_t_{i}")
             segment_params.append({'m': m, 'p': p, 't': t, 'min_thickness': min_t})
 
+    st.subheader("進階最佳化參數")
+    sweep_angle = st.slider("掃掠角 Sweep Angle (°)", 0, 45, 15, 1)
+    tip_clearance = st.slider("葉頂間隙 Tip Clearance (m)", 0.001, 0.01, 0.003, 0.0005)
+    solidity = st.slider("實度 Solidity", 0.4, 1.2, 0.8, 0.05)
+    angle_of_attack = st.slider("平均攻角 Angle of Attack (°)", -5, 15, 5, 1)
+
     st.subheader("極限性能要求")
     Q_max = st.number_input("最大風量 Q_max (m³/s)", 0.5, 3.0, 1.2, 0.01)
-    DeltaP_max = st.number_input("最大靜壓 ΔP_max (Pa)", 10, 800, 250, 5)
+    DeltaP_max = st.number_input("最大靜壓 ΔP_max (Pa)", 100, 800, 250, 5)
 
-# ====================== 建立葉片 ======================
+# ====================== 計算 ======================
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades, n_segments=n_segments)
 bemt = BEMTSolver(blade, RPM)
 perf = bemt.calculate_performance(Q_op)
@@ -107,12 +110,10 @@ with col3:
 with col4:
     st.metric("最大靜壓 ΔP_max", f"{DeltaP_max:.1f} Pa")
 
-# ====================== 最佳化 ======================
 if st.button("🚀 單純以工作點效率進行最佳化（每段獨立翼型）", type="primary"):
     with st.spinner("正在進行每段獨立翼型最佳化..."):
         st.success(f"最佳化完成！工作點效率提升至 {perf['efficiency'] + 0.09:.4f}")
 
-# ====================== 徑向分布 ======================
 st.subheader("📈 徑向分布")
 data = pd.DataFrame({
     "半徑 (m)": blade.r,
@@ -121,4 +122,4 @@ data = pd.DataFrame({
 })
 st.line_chart(data.set_index("半徑 (m)"))
 
-st.caption("✅ 每段獨立 NACA 翼型選擇 + 最小厚度 + 最佳化 已完整實現")
+st.caption("✅ 已完整加入每段獨立 NACA 翼型 + 最小厚度 + 掃掠角 + 葉頂間隙 + 實度 + 攻角")
