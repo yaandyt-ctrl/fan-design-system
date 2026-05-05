@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-# Plotly 3D 預覽
-import plotly.graph_objects as go
+# 使用 plotly.express（Cloud 最穩定）
+import plotly.express as px
 
 from geometry import AxialFanBlade
 from bemt import BEMTSolver
@@ -20,12 +20,12 @@ st.success("✅ BEMT + 最佳化 + 3D 預覽 已載入")
 # ====================== 側邊欄 ======================
 with st.sidebar:
     st.header("設計條件")
-    R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, DEFAULT_CONFIG['R_tip'], 0.005)
+    R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
     hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
-    N_blades = st.slider("葉片數", 5, 15, DEFAULT_CONFIG['N_blades'], 1)
-    RPM = st.slider("轉速 RPM", 500, 3000, DEFAULT_CONFIG['RPM'], 50)
-    Q_design = st.number_input("設計流量 Q (m³/s)", 0.1, 2.0, DEFAULT_CONFIG['Q_design'], 0.01)
-    DeltaP_design = st.number_input("設計靜壓 ΔP (Pa)", 50, 500, DEFAULT_CONFIG['DeltaP_design'], 5)
+    N_blades = st.slider("葉片數", 5, 15, 9, 1)
+    RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
+    Q_design = st.number_input("設計流量 Q (m³/s)", 0.1, 2.0, 0.8, 0.01)
+    DeltaP_design = st.number_input("設計靜壓 ΔP (Pa)", 50, 500, 150, 5)
     
     optimize_flag = st.checkbox("執行效率最佳化", value=True)
 
@@ -50,32 +50,25 @@ if optimize_flag and st.button("🚀 執行效率最佳化", type="primary"):
 
 # ====================== 3D 葉片預覽 ======================
 st.subheader("🌀 3D 葉片預覽（徑向堆疊）")
-fig3d = go.Figure()
 
 chords = blade.get_chord()
 betas = blade.get_beta()
+points = []
 
-for i in range(0, len(blade.r), max(1, len(blade.r)//10)):
+for i in range(0, len(blade.r), max(1, len(blade.r)//12)):
     x, y = blade.generate_airfoil_points(chords[i], betas[i])
-    z = np.full_like(x, blade.r[i])   # 徑向位置
-    fig3d.add_trace(go.Scatter3d(
-        x=x*0.4, y=y*0.4, z=z,
-        mode='lines',
-        name=f'r={blade.r[i]:.3f}m',
-        line=dict(width=4)
-    ))
+    z = np.full_like(x, blade.r[i])
+    points.append(pd.DataFrame({"x": x*0.4, "y": y*0.4, "z": z, "r": blade.r[i]}))
 
-fig3d.update_layout(
-    height=600,
-    scene=dict(
-        aspectmode='cube',
-        xaxis_title='Chord Direction',
-        yaxis_title='Thickness Direction',
-        zaxis_title='Radial Direction (m)'
-    ),
-    title="外轉子軸流扇葉 3D 模型預覽"
-)
-st.plotly_chart(fig3d, use_container_width=True)
+df_3d = pd.concat(points, ignore_index=True)
+
+fig = px.line_3d(df_3d, x="x", y="y", z="z", color="r", 
+                 title="外轉子軸流扇葉 3D 模型",
+                 labels={"x": "弦長方向", "y": "厚度方向", "z": "徑向 (m)"})
+fig.update_traces(line=dict(width=6))
+fig.update_layout(height=650, scene=dict(aspectmode='cube'))
+
+st.plotly_chart(fig, use_container_width=True)
 
 # ====================== STL 下載 ======================
 if st.button("📥 下載 3D STL 模型"):
@@ -83,4 +76,4 @@ if st.button("📥 下載 3D STL 模型"):
     with open("outputs/optimized_blade.stl", "rb") as f:
         st.download_button("下載 optimized_blade.stl", f.read(), "optimized_blade.stl", "model/stl")
 
-st.caption("✅ 3D 預覽 + BEMT + 最佳化已完整整合")
+st.caption("✅ 3D 預覽 + BEMT + 最佳化 已完整整合")
