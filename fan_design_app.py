@@ -79,7 +79,7 @@ with st.sidebar:
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
     RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
     Q_op = st.number_input("工作點流量 Q_op (m³/s)", 0.1, 2.0, 0.8, 0.01)
-    DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 50, 500, 150, 5)
+    DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 10, 500, 150, 5)
 
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
 bemt = BEMTSolver(blade, RPM)
