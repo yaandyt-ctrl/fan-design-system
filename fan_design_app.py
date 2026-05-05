@@ -1,10 +1,8 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime
-
-# 使用 plotly.express（Cloud 最穩定）
-import plotly.express as px
 
 from geometry import AxialFanBlade
 from bemt import BEMTSolver
@@ -15,7 +13,7 @@ from config import DEFAULT_CONFIG
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 完整 BEMT + 最佳化版本已載入")
+st.success("✅ BEMT + 最佳化完整版已載入（matplotlib 版）")
 
 # ====================== 側邊欄 ======================
 with st.sidebar:
@@ -31,7 +29,7 @@ with st.sidebar:
 
 # ====================== 主計算 ======================
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
-blade.params['chord_ctrl'] = np.array([0.12, 0.18, 0.15, 0.10])  # 預設值，可後續加滑桿
+blade.params['chord_ctrl'] = np.array([0.12, 0.18, 0.15, 0.10])
 blade.params['beta_ctrl'] = np.array([55, 45, 35, 28])
 
 bemt = BEMTSolver(blade, RPM)
@@ -46,15 +44,22 @@ with col2:
 if optimize_flag and st.button("🚀 執行效率最佳化", type="primary"):
     with st.spinner("最佳化計算中..."):
         opt_blade, best_eta = optimize_blade(blade, bemt, Q_design, DeltaP_design)
-        st.success(f"最佳化完成！η = {best_eta:.4f}")
+        st.success(f"最佳化完成！η = {best_eta:.4f}（提升 {(best_eta/perf['efficiency']-1)*100:.1f}%）")
+        blade = opt_blade
 
-# ====================== 徑向分布 ======================
+# ====================== 徑向分布圖 (使用 matplotlib) ======================
 st.subheader("徑向分布")
-fig = px.line(x=blade.r, y=blade.get_chord(), labels={'x':'半徑 (m)', 'y':'弦長 (m)'}, title="弦長分布")
-st.plotly_chart(fig, use_container_width=True)
+fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+ax[0].plot(blade.r, blade.get_chord())
+ax[0].set_title("弦長分布 (m)")
+ax[0].set_xlabel("半徑 (m)")
+ax[0].grid(True)
 
-fig2 = px.line(x=blade.r, y=blade.get_beta(), labels={'x':'半徑 (m)', 'y':'安裝角 (°)'}, title="安裝角分布")
-st.plotly_chart(fig2, use_container_width=True)
+ax[1].plot(blade.r, blade.get_beta())
+ax[1].set_title("安裝角分布 (°)")
+ax[1].set_xlabel("半徑 (m)")
+ax[1].grid(True)
+st.pyplot(fig)
 
 # ====================== STL 下載 ======================
 if st.button("📥 下載 3D STL 模型"):
@@ -62,4 +67,4 @@ if st.button("📥 下載 3D STL 模型"):
     with open("outputs/optimized_blade.stl", "rb") as f:
         st.download_button("下載 optimized_blade.stl", f.read(), "optimized_blade.stl", "model/stl")
 
-st.caption("✅ 已成功部署 | BEMT 計算 + 最佳化功能已恢復")
+st.caption("✅ 已成功部署 | BEMT + 最佳化 + STL 功能正常")
