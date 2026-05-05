@@ -11,11 +11,13 @@ st.success("✅ BEMT + 最佳化功能已恢復")
 with st.sidebar:
     st.header("設計條件")
     R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
-    hub_ratio = st.slider("輪轂比", 0.6, 0.9, 0.75, 0.01)
+    hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)   # ← 已修改
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
     RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
     Q_design = st.number_input("設計流量 Q (m³/s)", 0.1, 2.0, 0.8, 0.01)
     DeltaP_design = st.number_input("設計靜壓 ΔP (Pa)", 50, 500, 150, 5)
+    
+    optimize_flag = st.checkbox("執行效率最佳化", value=True)
 
 # ====================== 簡化 BEMT 計算 ======================
 eta = 0.62 + 0.15 * (1 - hub_ratio) + 0.0008 * RPM / 1000 - 0.08 * (R_tip - 0.2)
