@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 已加入最佳化前後性能曲線比較")
+st.success("✅ 單純以工作點效率進行最佳化")
 
 # ====================== AxialFanBlade ======================
 class AxialFanBlade:
@@ -52,62 +52,62 @@ class BEMTSolver:
         thrust = Q * 160
         return {'efficiency': min(0.88, eta), 'thrust': thrust}
 
+# ====================== 單純工作點效率最佳化 ======================
+def optimize_for_operating_point(blade, bemt, Q_target, trials=400):
+    best_eta = 0
+    best_chord = None
+    best_beta = None
+    for _ in range(trials):
+        chord = np.random.uniform(0.08, 0.26, 4)
+        beta = np.random.uniform(28, 65, 4)
+        blade.params['chord_ctrl'] = chord
+        blade.params['beta_ctrl'] = beta
+        p = bemt.calculate_performance(Q_target)
+        if p['efficiency'] > best_eta:
+            best_eta = p['efficiency']
+            best_chord = chord.copy()
+            best_beta = beta.copy()
+    blade.params['chord_ctrl'] = best_chord
+    blade.params['beta_ctrl'] = best_beta
+    return blade, best_eta
+
 # ====================== 主介面 ======================
 with st.sidebar:
-    st.header("設計條件")
+    st.header("工作點條件")
     R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
     hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
     RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
-
-    st.subheader("工作點")
     Q_op = st.number_input("工作點流量 Q_op (m³/s)", 0.1, 2.0, 0.8, 0.01)
     DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 50, 500, 150, 5)
-
-    st.subheader("極限性能要求")
-    Q_max = st.number_input("最大風量 Q_max (零靜壓) (m³/s)", 0.5, 3.0, 1.2, 0.01)
-    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 10, 800, 250, 5)
 
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
 bemt = BEMTSolver(blade, RPM)
 perf = bemt.calculate_performance(Q_op)
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("工作點效率 η", f"{perf['efficiency']:.4f}")
 with col2:
     st.metric("工作點流量", f"{Q_op:.3f} m³/s")
 with col3:
-    st.metric("最大風量 Q_max", f"{Q_max:.3f} m³/s")
-with col4:
-    st.metric("最大靜壓 ΔP_max", f"{DeltaP_max:.1f} Pa")
+    st.metric("工作點靜壓", f"{DeltaP_op:.1f} Pa")
 
-# ====================== 最佳化與前後比較 ======================
-if st.button("🚀 以工作點 + 最大風量 + 最大靜壓為目標進行最佳化", type="primary"):
-    with st.spinner("最佳化計算中..."):
-        # 記錄最佳化前參數
-        initial_chord = blade.params['chord_ctrl'].copy()
-        initial_beta = blade.params['beta_ctrl'].copy()
-        
-        # 簡化最佳化（網格搜尋）
-        best_eta = perf['efficiency']
-        best_chord = initial_chord.copy()
-        best_beta = initial_beta.copy()
-        
-        for _ in range(300):
-            chord = np.random.uniform(0.08, 0.26, 4)
-            beta = np.random.uniform(28, 65, 4)
-            blade.params['chord_ctrl'] = chord
-            blade.params['beta_ctrl'] = beta
-            p = bemt.calculate_performance(Q_op)
-            if p['efficiency'] > best_eta:
-                best_eta = p['efficiency']
-                best_chord = chord.copy()
-                best_beta = beta.copy()
-        
-        # 更新為最佳化後參數
-        blade.params['chord_ctrl'] = best_chord
-        blade.params['beta_ctrl'] = best_beta
+if st.button("🚀 單純以工作點效率進行最佳化", type="primary"):
+    with st.spinner("正在進行工作點效率最佳化..."):
+        opt_blade, best_eta = optimize_for_operating_point(blade, bemt, Q_op)
+        st.success(f"工作點效率最佳化完成！效率提升至 {best_eta:.4f}")
+
+# ====================== 徑向分布 ======================
+st.subheader("📈 徑向分布")
+data = pd.DataFrame({
+    "半徑 (m)": blade.r,
+    "弦長 (m)": blade.get_chord(),
+    "安裝角 (°)": blade.get_beta()
+})
+st.line_chart(data.set_index("半徑 (m)"))
+
+st.caption("✅ 單純以工作點效率進行最佳化模式")
         
         st.success(f"最佳化完成！工作點效率提升至 {best_eta:.4f}")
 
