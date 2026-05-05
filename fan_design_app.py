@@ -3,9 +3,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-# 使用 plotly.express（Cloud 最穩定）
-import plotly.express as px
-
 from geometry import AxialFanBlade
 from bemt import BEMTSolver
 from optimizer import optimize_blade
@@ -15,7 +12,7 @@ from config import DEFAULT_CONFIG
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ BEMT + 最佳化 + 3D 預覽 已載入")
+st.success("✅ BEMT + 最佳化版本（已取消 3D 預覽）")
 
 # ====================== 側邊欄 ======================
 with st.sidebar:
@@ -46,29 +43,17 @@ with col2:
 if optimize_flag and st.button("🚀 執行效率最佳化", type="primary"):
     with st.spinner("最佳化計算中..."):
         opt_blade, best_eta = optimize_blade(blade, bemt, Q_design, DeltaP_design)
-        st.success(f"最佳化完成！η = {best_eta:.4f}")
+        st.success(f"最佳化完成！η = {best_eta:.4f}（提升 {(best_eta/perf['efficiency']-1)*100:.1f}%）")
+        blade = opt_blade
 
-# ====================== 3D 葉片預覽 ======================
-st.subheader("🌀 3D 葉片預覽（徑向堆疊）")
-
-chords = blade.get_chord()
-betas = blade.get_beta()
-points = []
-
-for i in range(0, len(blade.r), max(1, len(blade.r)//12)):
-    x, y = blade.generate_airfoil_points(chords[i], betas[i])
-    z = np.full_like(x, blade.r[i])
-    points.append(pd.DataFrame({"x": x*0.4, "y": y*0.4, "z": z, "r": blade.r[i]}))
-
-df_3d = pd.concat(points, ignore_index=True)
-
-fig = px.line_3d(df_3d, x="x", y="y", z="z", color="r", 
-                 title="外轉子軸流扇葉 3D 模型",
-                 labels={"x": "弦長方向", "y": "厚度方向", "z": "徑向 (m)"})
-fig.update_traces(line=dict(width=6))
-fig.update_layout(height=650, scene=dict(aspectmode='cube'))
-
-st.plotly_chart(fig, use_container_width=True)
+# ====================== 徑向分布 ======================
+st.subheader("📈 徑向分布")
+data = pd.DataFrame({
+    "半徑 (m)": blade.r,
+    "弦長 (m)": blade.get_chord(),
+    "安裝角 (°)": blade.get_beta()
+})
+st.line_chart(data.set_index("半徑 (m)"))
 
 # ====================== STL 下載 ======================
 if st.button("📥 下載 3D STL 模型"):
@@ -76,4 +61,4 @@ if st.button("📥 下載 3D STL 模型"):
     with open("outputs/optimized_blade.stl", "rb") as f:
         st.download_button("下載 optimized_blade.stl", f.read(), "optimized_blade.stl", "model/stl")
 
-st.caption("✅ 3D 預覽 + BEMT + 最佳化 已完整整合")
+st.caption("✅ 已取消 3D 預覽 | 程式更穩定")
