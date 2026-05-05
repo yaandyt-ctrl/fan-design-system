@@ -1,11 +1,11 @@
 import streamlit as st
 import numpy as np
-import plotly.graph_objects as go   # ← 改成這樣
+import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 from datetime import datetime
 
-# 其他 import...
+# ==================== 您的其他 import ====================
 from geometry import AxialFanBlade
 from bemt import BEMTSolver
 from optimizer import optimize_blade
