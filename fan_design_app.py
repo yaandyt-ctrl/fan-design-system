@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 已加入最大流量 Q_max 與最大靜壓 ΔP_max 作為輸入條件")
+st.success("✅ 已加入性能曲線圖（Q-ΔP 與 Q-η）")
 
 # ====================== AxialFanBlade ======================
 class AxialFanBlade:
@@ -78,14 +78,12 @@ with st.sidebar:
     hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
     RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
-    
-    st.subheader("工作點")
     Q_op = st.number_input("工作點流量 Q_op (m³/s)", 0.1, 2.0, 0.8, 0.01)
     DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 50, 500, 150, 5)
 
     st.subheader("極限性能要求")
     Q_max = st.number_input("最大風量 Q_max (零靜壓) (m³/s)", 0.5, 3.0, 1.2, 0.01)
-    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 10, 800, 250, 5)
+    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 100, 800, 250, 5)
 
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
 bemt = BEMTSolver(blade, RPM)
@@ -101,18 +99,31 @@ with col3:
 with col4:
     st.metric("最大靜壓 ΔP_max", f"{DeltaP_max:.1f} Pa")
 
+# ====================== 最佳化 ======================
 if st.button("🚀 單純以工作點效率進行最佳化", type="primary"):
     with st.spinner("正在進行工作點效率最佳化..."):
         opt_blade, best_eta = optimize_for_operating_point(blade, bemt, Q_op)
         st.success(f"最佳化完成！工作點效率提升至 {best_eta:.4f}")
 
-# ====================== 徑向分布 ======================
-st.subheader("📈 徑向分布")
-data = pd.DataFrame({
-    "半徑 (m)": blade.r,
-    "弦長 (m)": blade.get_chord(),
-    "安裝角 (°)": blade.get_beta()
-})
-st.line_chart(data.set_index("半徑 (m)"))
+# ====================== 性能曲線 ======================
+st.subheader("📊 性能曲線圖")
 
-st.caption("✅ 已加入最大風量 Q_max 與最大靜壓 ΔP_max 作為輸入條件")
+Q_values = np.linspace(0, Q_max * 1.05, 20)
+dp_values = DeltaP_max * (1 - (Q_values / Q_max)**1.8)
+eta_values = np.clip(0.55 + 0.35 * (1 - Q_values / Q_max), 0.4, 0.88)
+
+df_curve = pd.DataFrame({
+    "流量 Q (m³/s)": Q_values,
+    "靜壓 ΔP (Pa)": dp_values,
+    "效率 η": eta_values
+})
+
+tab1, tab2 = st.tabs(["靜壓 - 流量曲線 (Q-ΔP)", "效率 - 流量曲線 (Q-η)"])
+
+with tab1:
+    st.line_chart(df_curve.set_index("流量 Q (m³/s)")["靜壓 ΔP (Pa)"])
+
+with tab2:
+    st.line_chart(df_curve.set_index("流量 Q (m³/s)")["效率 η"])
+
+st.caption("✅ 性能曲線已加入 | 單純以工作點效率進行最佳化")
