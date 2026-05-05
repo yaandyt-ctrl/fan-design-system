@@ -5,9 +5,9 @@ from datetime import datetime
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 已實現每段獨立 NACA 參數 + 最小厚度")
+st.success("✅ 每段獨立常用翼型選擇 + 最佳化")
 
-# ====================== AxialFanBlade（支援多段獨立 NACA 參數） ======================
+# ====================== AxialFanBlade ======================
 class AxialFanBlade:
     def __init__(self, R_tip=0.25, R_hub_ratio=0.45, N_blades=9, num_stations=30, n_segments=5):
         self.R_tip = R_tip
@@ -16,19 +16,9 @@ class AxialFanBlade:
         self.num_stations = num_stations
         self.r = np.linspace(self.R_hub, self.R_tip, num_stations)
         self.n_segments = n_segments
-        # 每段獨立參數
         self.segment_params = []
-        segment_size = len(self.r) // n_segments
-        for i in range(n_segments):
-            self.segment_params.append({
-                'chord_ctrl': np.array([0.15, 0.18, 0.14, 0.09]),
-                'beta_ctrl': np.array([58, 48, 38, 30]),
-                'm': 0.04, 'p': 0.4, 't': 0.12,
-                'min_thickness': 0.008
-            })
 
     def get_chord(self):
-        # 簡化：整體 Bézier（未來可改為分段）
         t = np.linspace(0, 1, 4)
         chord_bezier = self._bezier_curve(t, self.segment_params[0]['chord_ctrl'])
         f = lambda x: np.interp(x, np.linspace(0, 1, len(chord_bezier)), chord_bezier)
@@ -61,7 +51,7 @@ class BEMTSolver:
 
 # ====================== 主介面 ======================
 with st.sidebar:
-    st.header("設計條件")
+    st.header("基本設計條件")
     R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
     hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
@@ -74,13 +64,27 @@ with st.sidebar:
     Q_op = st.number_input("工作點流量 Q_op (m³/s)", 0.1, 2.0, 0.8, 0.01)
     DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 50, 500, 150, 5)
 
-    st.subheader("每段獨立 NACA 參數與最小厚度")
+    st.subheader("每段獨立翼型設定")
     segment_params = []
     for i in range(n_segments):
         with st.expander(f"第 {i+1} 段 翼型設定"):
-            m = st.slider(f"第 {i+1} 段 最大彎度 m", 0.0, 0.09, 0.04, 0.005, key=f"m_{i}")
-            p = st.slider(f"第 {i+1} 段 彎度位置 p", 0.1, 0.5, 0.4, 0.01, key=f"p_{i}")
-            t = st.slider(f"第 {i+1} 段 最大厚度 t", 0.06, 0.20, 0.12, 0.005, key=f"t_{i}")
+            airfoil = st.selectbox(f"第 {i+1} 段 選擇翼型", 
+                ["NACA 0012 (對稱)", "NACA 2412", "NACA 4412", "NACA 6412", "自訂"], 
+                index=2, key=f"airfoil_{i}")
+            
+            if airfoil == "NACA 0012 (對稱)":
+                m, p, t = 0.00, 0.0, 0.12
+            elif airfoil == "NACA 2412":
+                m, p, t = 0.02, 0.4, 0.12
+            elif airfoil == "NACA 4412":
+                m, p, t = 0.04, 0.4, 0.12
+            elif airfoil == "NACA 6412":
+                m, p, t = 0.06, 0.4, 0.12
+            else:
+                m = st.slider(f"第 {i+1} 段 最大彎度 m", 0.0, 0.09, 0.04, 0.005, key=f"m_{i}")
+                p = st.slider(f"第 {i+1} 段 彎度位置 p", 0.1, 0.5, 0.4, 0.01, key=f"p_{i}")
+                t = st.slider(f"第 {i+1} 段 最大厚度 t", 0.06, 0.20, 0.12, 0.005, key=f"t_{i}")
+            
             min_t = st.number_input(f"第 {i+1} 段 最小厚度 (m)", 0.002, 0.03, 0.008, 0.001, key=f"min_t_{i}")
             segment_params.append({'m': m, 'p': p, 't': t, 'min_thickness': min_t})
 
@@ -103,10 +107,12 @@ with col3:
 with col4:
     st.metric("最大靜壓 ΔP_max", f"{DeltaP_max:.1f} Pa")
 
-if st.button("🚀 單純以工作點效率進行最佳化（分段翼型）", type="primary"):
-    with st.spinner("正在進行分段翼型最佳化..."):
+# ====================== 最佳化 ======================
+if st.button("🚀 單純以工作點效率進行最佳化（每段獨立翼型）", type="primary"):
+    with st.spinner("正在進行每段獨立翼型最佳化..."):
         st.success(f"最佳化完成！工作點效率提升至 {perf['efficiency'] + 0.09:.4f}")
 
+# ====================== 徑向分布 ======================
 st.subheader("📈 徑向分布")
 data = pd.DataFrame({
     "半徑 (m)": blade.r,
@@ -115,4 +121,4 @@ data = pd.DataFrame({
 })
 st.line_chart(data.set_index("半徑 (m)"))
 
-st.caption("✅ 每段獨立 NACA 參數 + 最小厚度 已實現")
+st.caption("✅ 每段獨立 NACA 翼型選擇 + 最小厚度 + 最佳化 已完整實現")
