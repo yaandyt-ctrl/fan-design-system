@@ -7,7 +7,7 @@ from scipy.interpolate import interp1d
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 單檔案完整版已載入")
+st.success("✅ 工作點效率最佳化版本")
 
 # ====================== AxialFanBlade 類別 ======================
 class AxialFanBlade:
@@ -79,12 +79,12 @@ class BEMTSolver:
         eta = (thrust * V_a) / power if power > 0 else 0.0
         return {'efficiency': eta, 'thrust': thrust, 'power': power}
 
-# ====================== 最佳化 ======================
+# ====================== 最佳化（以工作點效率為目標） ======================
 def objective(x, blade, bemt, Q_target, DeltaP_target):
     blade.params['chord_ctrl'] = x[:4]
     blade.params['beta_ctrl'] = x[4:]
     perf = bemt.calculate_performance(Q_target)
-    penalty = abs(perf['thrust'] * 1.25 - DeltaP_target) * 0.02
+    penalty = abs(perf['thrust'] * 1.25 - DeltaP_target) * 0.01
     return -perf['efficiency'] + penalty
 
 def optimize_blade(blade, bemt, Q_target, DeltaP_target):
@@ -95,4 +95,30 @@ def optimize_blade(blade, bemt, Q_target, DeltaP_target):
     return blade, -result.fun
 
 # ====================== 主介面 ======================
-with st.sidebar
+with st.sidebar:
+    st.header("工作點條件")
+    R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
+    hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
+    N_blades = st.slider("葉片數", 5, 15, 9, 1)
+    RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
+    Q_op = st.number_input("工作點流量 Q (m³/s)", 0.1, 2.0, 0.8, 0.01, key="qop")
+    DeltaP_op = st.number_input("工作點靜壓 ΔP (Pa)", 50, 500, 150, 5, key="dpop")
+
+blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
+bemt = BEMTSolver(blade, RPM)
+perf = bemt.calculate_performance(Q_op)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("工作點效率 η", f"{perf['efficiency']:.4f}")
+with col2:
+    st.metric("工作點流量", f"{Q_op:.3f} m³/s")
+with col3:
+    st.metric("工作點靜壓", f"{DeltaP_op:.1f} Pa")
+
+if st.button("🚀 以工作點為目標進行效率最佳化", type="primary"):
+    with st.spinner("Differential Evolution 最佳化中..."):
+        opt_blade, best_eta = optimize_blade(blade, bemt, Q_op, DeltaP_op)
+        st.success(f"工作點最佳化完成！效率提升至 {best_eta:.4f}")
+
+st.caption("✅ 工作點效率最佳化模式 | 輪轂比 0.1~0.6")
