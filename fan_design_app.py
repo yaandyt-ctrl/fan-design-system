@@ -66,7 +66,7 @@ with st.sidebar:
 
     st.subheader("極限性能要求")
     Q_max = st.number_input("最大風量 Q_max (零靜壓) (m³/s)", 0.5, 3.0, 1.2, 0.01)
-    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 100, 800, 250, 5)
+    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 10, 800, 250, 5)
 
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
 bemt = BEMTSolver(blade, RPM)
