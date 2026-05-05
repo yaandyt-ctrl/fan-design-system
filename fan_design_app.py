@@ -1,9 +1,11 @@
 import streamlit as st
-import streamlit as st
-st.set_page_config(page_title="扇葉設計系統", layout="wide", initial_sidebar_state="expanded")
 import numpy as np
-import plotly.graph_objects as go
+import plotly.graph_objects as go   # ← 改成這樣
 from plotly.subplots import make_subplots
+import pandas as pd
+from datetime import datetime
+
+# 其他 import...
 from geometry import AxialFanBlade
 from bemt import BEMTSolver
 from optimizer import optimize_blade
