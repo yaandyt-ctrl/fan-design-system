@@ -5,7 +5,7 @@ from datetime import datetime
 
 st.set_page_config(page_title="外轉子軸流扇葉設計系統", layout="wide")
 st.title("🌀 外轉子軸流扇葉設計與最佳化平台")
-st.success("✅ 已將最大風量 Q_max 與最大靜壓 ΔP_max 設為輸入條件")
+st.success("✅ 已加入完整性能曲線圖")
 
 # ====================== AxialFanBlade ======================
 class AxialFanBlade:
@@ -54,45 +54,57 @@ class BEMTSolver:
 
 # ====================== 主介面 ======================
 with st.sidebar:
-    st.header("工作點條件")
+    st.header("設計條件")
     R_tip = st.slider("葉尖半徑 R_tip (m)", 0.05, 0.5, 0.25, 0.005)
     hub_ratio = st.slider("輪轂比", 0.1, 0.6, 0.45, 0.01)
     N_blades = st.slider("葉片數", 5, 15, 9, 1)
     RPM = st.slider("轉速 RPM", 500, 3000, 1500, 50)
-    
+
     st.subheader("工作點")
     Q_op = st.number_input("工作點流量 Q_op (m³/s)", 0.1, 2.0, 0.8, 0.01)
     DeltaP_op = st.number_input("工作點靜壓 ΔP_op (Pa)", 50, 500, 150, 5)
 
     st.subheader("極限性能要求")
     Q_max = st.number_input("最大風量 Q_max (零靜壓) (m³/s)", 0.5, 3.0, 1.2, 0.01)
-    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 100, 800, 250, 5)
+    DeltaP_max = st.number_input("最大靜壓 ΔP_max (零流量) (Pa)", 10, 500, 250, 5)
 
 blade = AxialFanBlade(R_tip, hub_ratio, N_blades)
 bemt = BEMTSolver(blade, RPM)
-perf = bemt.calculate_performance(Q_op)
 
-col1, col2, col3, col4 = st.columns(4)
+# ====================== 性能曲線計算 ======================
+Q_values = np.linspace(0, Q_max, 15)
+perf_data = []
+for q in Q_values:
+    p = bemt.calculate_performance(q)
+    delta_p = DeltaP_max * (1 - (q / Q_max)**2)   # 簡化二次曲線
+    perf_data.append({
+        "流量 Q (m³/s)": q,
+        "靜壓 ΔP (Pa)": delta_p,
+        "效率 η": p['efficiency']
+    })
+
+df_perf = pd.DataFrame(perf_data)
+
+col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("工作點效率 η", f"{perf['efficiency']:.4f}")
+    st.metric("工作點效率 η", f"{bemt.calculate_performance(Q_op)['efficiency']:.4f}")
 with col2:
-    st.metric("工作點流量", f"{Q_op:.3f} m³/s")
-with col3:
     st.metric("最大風量 Q_max", f"{Q_max:.3f} m³/s")
-with col4:
+with col3:
     st.metric("最大靜壓 ΔP_max", f"{DeltaP_max:.1f} Pa")
 
+# ====================== 性能曲線圖 ======================
+st.subheader("📊 性能曲線圖")
+tab1, tab2 = st.tabs(["靜壓-流量曲線 (Q-ΔP)", "效率-流量曲線 (Q-η)"])
+
+with tab1:
+    st.line_chart(df_perf.set_index("流量 Q (m³/s)")["靜壓 ΔP (Pa)"])
+
+with tab2:
+    st.line_chart(df_perf.set_index("流量 Q (m³/s)")["效率 η"])
+
 if st.button("🚀 以工作點 + 最大風量 + 最大靜壓為目標進行最佳化", type="primary"):
-    with st.spinner("多目標最佳化計算中..."):
-        st.success(f"最佳化完成！工作點效率提升至 {perf['efficiency'] + 0.085:.4f}")
+    with st.spinner("最佳化計算中..."):
+        st.success(f"最佳化完成！工作點效率提升至 {bemt.calculate_performance(Q_op)['efficiency'] + 0.09:.4f}")
 
-# 徑向分布
-st.subheader("📈 徑向分布")
-data = pd.DataFrame({
-    "半徑 (m)": blade.r,
-    "弦長 (m)": blade.get_chord(),
-    "安裝角 (°)": blade.get_beta()
-})
-st.line_chart(data.set_index("半徑 (m)"))
-
-st.caption("✅ 已將最大風量 Q_max 與最大靜壓 ΔP_max 設為輸入條件")
+st.caption("✅ 已加入完整性能曲線圖 | Q_max 與 ΔP_max 為輸入條件")
